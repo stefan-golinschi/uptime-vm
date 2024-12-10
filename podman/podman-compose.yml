@@ -1,0 +1,24 @@
+services:
+  caddy:
+    container_name: caddy
+    image: ${CADDY_IMAGE}:${CADDY_TAG}
+    volumes:
+      - ./caddy:/etc/caddy:ro,z
+      - caddy_data:/data
+      - caddy_config:/config
+    ports:
+      - 8008:80/tcp
+      - 8443:443/tcp
+    restart: always
+
+  uptimekuma:
+    container_name: uptimekuma
+    image: ${UPTIMEKUMA_IMAGE}:${UPTIMEKUMA_TAG}
+    volumes:
+      - uptimekuma:/app/data
+    restart: always
+
+volumes:
+  caddy_data:
+  caddy_config:
+  uptimekuma:

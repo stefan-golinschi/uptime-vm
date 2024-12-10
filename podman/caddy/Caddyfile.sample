@@ -1,0 +1,11 @@
+{
+    email contact@your-name.com
+
+    log {
+        level ERROR
+    }
+}
+
+your.public.hostname {
+    reverse_proxy uptimekuma:3001
+}

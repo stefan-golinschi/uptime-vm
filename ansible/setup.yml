@@ -1,0 +1,84 @@
+- name: Preconfigure system
+  hosts: all
+  vars:
+    var_hostname: "uptime-rocky9.local"
+  tasks:
+    - name: Install rpm packages
+      become: true
+      ansible.builtin.package:
+        name:
+          - vim
+          - podman
+          - python3-pip
+    - name: Set hostname
+      become: true
+      ansible.builtin.hostname:
+        name: "{{ var_hostname }}"
+    - name: Update pip
+      ansible.builtin.command: pip install --upgrade pip
+    - name: Install podman-compose from pypi
+      ansible.builtin.command: pip install podman-compose
+    - name: Install podman-compose from pypi for root
+      become: true
+      ansible.builtin.command: pip install podman-compose
+
+- name: Configure firewalld
+  hosts: all
+  become: true
+  tasks:
+    - name: Install firewalld
+      ansible.builtin.package:
+        name: firewalld
+        state: present
+
+    - name: Start and enable firewalld service
+      ansible.builtin.systemd:
+        name: firewalld
+        state: started
+        enabled: true
+
+    - name: Add port forwarding rule for port 80
+      ansible.builtin.command:
+        cmd: firewall-cmd --add-forward-port=port=80:proto=tcp:toport=8008:toaddr= --permanent
+
+    - name: Add port forwarding rule for port 443
+      ansible.builtin.command:
+        cmd: firewall-cmd --add-forward-port=port=443:proto=tcp:toport=8443:toaddr= --permanent
+    
+    - name: Add http as allowed service
+      ansible.builtin.firewalld:
+        permanent: true
+        service: http
+        state: enabled
+
+    - name: Add https as allowed service
+      ansible.builtin.firewalld:
+        permanent: true
+        service: https
+        state: enabled
+
+    - name: Reload firewalld to apply changes
+      ansible.builtin.command: firewall-cmd --reload
+
+- name: Configure containers
+  hosts: all
+  tasks:
+    - name: Create podman containers
+      ansible.builtin.copy:
+        src: ../podman/
+        dest: /home/rocky/uptimeserver/
+        owner: rocky
+        group: rocky
+    - name: Create systemd unit file for podman-compose
+      become: true
+      ansible.builtin.command: ~rocky/.local/bin/podman-compose systemd -a create-unit
+    - name: Register pods to podman compose
+      ansible.builtin.command:
+        cmd: podman-compose systemd -a register
+        chdir: /home/rocky/uptimeserver/
+    - name: Enable systemd unit file for podman
+      ansible.builtin.systemd:
+        name: podman-compose@uptimeserver
+        state: started
+        enabled: true
+        scope: user
