@@ -44,6 +44,10 @@
     - name: Add port forwarding rule for port 443
       ansible.builtin.command:
         cmd: firewall-cmd --add-forward-port=port=443:proto=tcp:toport=8443:toaddr= --permanent
+      
+    - name: Enable masquerade
+      ansible.builtin.command:
+        cmd: firewall-cmd --zone=public --add-masquerade --permanent
     
     - name: Add http as allowed service
       ansible.builtin.firewalld:
@@ -62,6 +66,8 @@
 
 - name: Configure containers
   hosts: all
+  vars:
+    systemd_user: "rocky"
   tasks:
     - name: Create podman containers
       ansible.builtin.copy:
@@ -69,13 +75,16 @@
         dest: /home/rocky/uptimeserver/
         owner: rocky
         group: rocky
+    - name: Enable linger for {{ systemd_user }} user
+      ansible.builtin.command: "loginctl enable-linger {{ systemd_user }}"
+      register: linger
     - name: Create systemd unit file for podman-compose
       become: true
-      ansible.builtin.command: ~rocky/.local/bin/podman-compose systemd -a create-unit
+      ansible.builtin.command: ~{{ systemd_user }}/.local/bin/podman-compose systemd -a create-unit
     - name: Register pods to podman compose
       ansible.builtin.command:
         cmd: podman-compose systemd -a register
-        chdir: /home/rocky/uptimeserver/
+        chdir: /home/{{ systemd_user }}/uptimeserver/
     - name: Enable systemd unit file for podman
       ansible.builtin.systemd:
         name: podman-compose@uptimeserver
